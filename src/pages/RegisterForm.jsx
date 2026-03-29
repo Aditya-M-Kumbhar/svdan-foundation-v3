@@ -9,6 +9,7 @@ import sizeChart from '../assets/form/size_chart.png'
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
 const SHEETS_WEBHOOK_URL = import.meta.env.VITE_SHEETS_WEBHOOK_URL
+const REGISTRATION_OPEN = true
 
 const branches = [
   'Computer Engineering',
@@ -50,6 +51,34 @@ export default function RegisterForm() {
     formState: { errors },
     reset,
   } = useForm()
+
+    if (!REGISTRATION_OPEN) {
+    return (
+      <div className="min-h-screen bg-orange-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-3xl shadow-xl p-10 max-w-md w-full text-center">
+          <div className="text-6xl mb-4">🙏</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-3">
+            Registrations Closed!
+          </h2>
+          <p className="text-gray-600 text-sm mb-4 leading-relaxed">
+            We are grateful for such an incredible response from all of you!
+            The registration form is currently closed.
+            We will be opening it again very soon — see you soon! 😊
+          </p>
+          <p className="text-gray-500 text-sm mb-6">
+            For queries, contact us at:
+          </p>
+          <a
+            href="tel:+918010388950"
+            className="inline-block bg-orange-500 hover:bg-orange-600 text-white font-bold px-8 py-3 rounded-full transition-colors duration-200 shadow-md"
+          >
+            📞 +91 8010388950
+          </a>
+        </div>
+      </div>
+    )
+  }
+
 
   const onSubmit = async (data) => {
     if (!agreed) {
