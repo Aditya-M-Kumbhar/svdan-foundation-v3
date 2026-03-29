@@ -9,7 +9,7 @@ import sizeChart from '../assets/form/size_chart.png'
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
 const SHEETS_WEBHOOK_URL = import.meta.env.VITE_SHEETS_WEBHOOK_URL
-const REGISTRATION_OPEN = true
+const REGISTRATION_OPEN = false
 
 const branches = [
   'Computer Engineering',
