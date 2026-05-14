@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import donationQR from '../assets/form/donationpayment.png'
-import { collection, addDoc } from 'firebase/firestore'
+import { collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
@@ -45,6 +45,24 @@ async function uploadToCloudinary(file) {
   return data.secure_url
 }
 
+async function generateReceiptNumber() {
+  try {
+    const q = query(collection(db, 'donations'), orderBy('createdAt', 'desc'), limit(1))
+    const snapshot = await getDocs(q)
+    const year = new Date().getFullYear()
+    if (snapshot.empty) {
+      return `SVDNF-${year}-001`
+    }
+    const last = snapshot.docs[0].data()
+    const lastNum = last.receiptNumber ? parseInt(last.receiptNumber.split('-')[2]) : 0
+    const nextNum = String(lastNum + 1).padStart(3, '0')
+    return `SVDNF-${year}-${nextNum}`
+  } catch {
+    const timestamp = Date.now().toString().slice(-4)
+    return `SVDNF-${new Date().getFullYear()}-${timestamp}`
+  }
+}
+
 export default function DonationForm() {
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
@@ -59,7 +77,7 @@ export default function DonationForm() {
   const [screenshotPreview, setScreenshotPreview] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
+  const [wantReceipt, setWantReceipt] = useState(false)
 
   const finalAmount = customAmount || amount
 
@@ -90,59 +108,52 @@ export default function DonationForm() {
 
     try {
       const paymentScreenshotUrl = await uploadToCloudinary(screenshot)
+      const receiptNumber = await generateReceiptNumber()
+      const createdAt = new Date().toISOString()
 
-const formData = {
-  timestamp: new Date().toISOString(),
-  amount: Number(finalAmount),
-  volunteerName: volunteerName || 'Direct Donation',
-  donorName: donorName || 'Anonymous',
-  contact,
-  specialNote: specialNote || '',
-  paymentScreenshotUrl,
-  transactionId,
-}
+      const formData = {
+        timestamp: createdAt,
+        createdAt,
+        amount: Number(finalAmount),
+        volunteerName: volunteerName || 'Direct Donation',
+        donorName: donorName || 'Anonymous',
+        contact,
+        specialNote: specialNote || '',
+        paymentScreenshotUrl,
+        transactionId,
+        receiptNumber,
+        receiptRequested: wantReceipt,
+      }
 
-await fetch(DONATION_SHEETS_URL, {
-  method: 'POST',
-  mode: 'no-cors',
-  headers: {
-    'Content-Type': 'text/plain',
-  },
-  body: JSON.stringify(formData),
-})
+      await fetch(DONATION_SHEETS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(formData),
+      })
 
-    await addDoc(collection(db, 'donations'), formData)
+      await addDoc(collection(db, 'donations'), formData)
 
-      setSuccess(true)
+      navigate('/donation-success', {
+        state: {
+          receiptRequested: wantReceipt,
+          receiptData: {
+            receiptNumber,
+            donorName: donorName || 'Anonymous',
+            amount: Number(finalAmount),
+            transactionId,
+            volunteerName: volunteerName || 'Direct Donation',
+            contact,
+            createdAt,
+          },
+        },
+      })
     } catch (err) {
       setError('Something went wrong! Please try again.')
       console.error(err)
     } finally {
       setLoading(false)
     }
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen bg-green-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-3xl shadow-xl p-10 max-w-md w-full text-center">
-          <div className="text-6xl mb-4">🙏</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-3">
-            Thank You for Your Donation!
-          </h2>
-          <p className="text-gray-500 text-sm mb-6">
-            Your generous contribution of ₹{finalAmount} will make a real difference.
-            The SVDAN Foundation is grateful for your support!
-          </p>
-          <button
-            onClick={() => navigate('/')}
-            className="bg-green-500 hover:bg-green-600 text-white font-bold px-8 py-3 rounded-full transition-colors duration-200"
-          >
-            Back to Home
-          </button>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -252,7 +263,7 @@ await fetch(DONATION_SHEETS_URL, {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Volunteer Name <span className="text-gray-400 font-normal">(Optional — fill if donation collected by volunteer)</span>
+                Volunteer Name <span className="text-gray-400 font-normal">(Optional)</span>
               </label>
               <input
                 type="text"
@@ -303,17 +314,17 @@ await fetch(DONATION_SHEETS_URL, {
             </div>
 
             <div className="bg-green-50 border border-green-200 rounded-2xl p-5 text-center">
-        <h3 className="text-gray-800 font-bold text-base mb-1">Pay via GPay / UPI</h3>
-        <p className="text-green-600 font-bold text-2xl mb-3">₹{finalAmount}</p>
-        <img
-            src={donationQR}
-            alt="Donation Payment QR"
-            className="w-48 h-48 object-contain mx-auto rounded-xl border border-green-200"
-        />
-        <p className="text-gray-500 text-xs mt-3">
-        Scan QR code and pay. Then upload screenshot below.
-        </p>
-        </div>
+              <h3 className="text-gray-800 font-bold text-base mb-1">Pay via GPay / UPI</h3>
+              <p className="text-green-600 font-bold text-2xl mb-3">₹{finalAmount}</p>
+              <img
+                src={donationQR}
+                alt="Donation Payment QR"
+                className="w-48 h-48 object-contain mx-auto rounded-xl border border-green-200"
+              />
+              <p className="text-gray-500 text-xs mt-3">
+                Scan QR code and pay. Then upload screenshot below.
+              </p>
+            </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
@@ -351,6 +362,23 @@ await fetch(DONATION_SHEETS_URL, {
                   className="mt-3 w-full max-h-48 object-contain rounded-xl border border-gray-200"
                 />
               )}
+            </div>
+
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={wantReceipt}
+                  onChange={(e) => setWantReceipt(e.target.checked)}
+                  className="w-4 h-4 accent-orange-500"
+                />
+                <span className="text-sm font-semibold text-gray-700">
+                  I want a donation receipt (PDF)
+                </span>
+              </label>
+              <p className="text-gray-400 text-xs mt-2 ml-7">
+                An official receipt will be available for download after submission
+              </p>
             </div>
 
             {error && (
